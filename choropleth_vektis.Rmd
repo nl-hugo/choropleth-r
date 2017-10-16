@@ -1,0 +1,169 @@
+---
+title: "Choropleth with Vektis data"
+author: "Hugo Janssen (nl-hugo)"
+date: "`r format(Sys.time(), '%d-%m-%Y')`"
+output: html_document
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  out.width = "100%",
+  dpi = 300,
+  fig.width = 6,
+  fig.height = 5,
+  fig.path = "img/kosten-msz-",
+  strip.white = T,
+  dev = "png",
+  dev.args = list(png = list(bg = "transparent")),
+  echo = TRUE, warning = FALSE, message = FALSE
+)
+```
+
+
+This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb) and [Kadaster](https://www.kadaster.com/). 
+
+
+### Setup
+
+Load the required packages and specify the file locations.
+
+```{r}
+#install.packages(c("rgeos", "maptools", "ggplot2", "dplyr", "plyr", "ggthemes"))
+library(rgeos)
+library(maptools)
+library(ggplot2)
+library(ggthemes)
+library(plyr)
+library(dplyr)
+
+# specify file locations
+cbsURL <-"https://www.cbs.nl/-/media/_pdf/2017/36/buurt_2017.zip"
+vektisURL <- "https://www.vektis.nl/uploads/Docs%20per%20pagina/Open%20Data%20Bestanden/Vektis%20Open%20Databestand%20Zorgverzekeringswet%202015%20-%20gemeente.csv"
+datadir <- "data"
+
+```
+
+
+### Download
+
+Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present. 
+
+```{r}
+csv <- paste(datadir, "gemeente_2015.csv", sep = "/")
+
+# create a dir and download if no datadir is present 
+# assumes that files are downloaded if a datadir is present
+if (!file.exists(datadir)) {
+  dir.create(datadir)
+
+  # cbs bestanden
+  tmpfile <- paste(datadir, basename(cbsURL), sep = "/")
+  download.file(cbsURL, destfile = tmpfile)
+  unzip(tmpfile, exdir="./data")
+  
+  # vektis bestanden
+  download.file(vektisURL, destfile = csv)
+}
+```
+
+
+### Prepare data
+
+
+Read Vektis data first and aggregate by municipality. Municipality names that differ from the official CBS name, need to be renamed.
+
+```{r}
+# read csv
+vektis.df <- read.csv(csv, sep = ";", stringsAsFactors = FALSE)
+names(vektis.df) <- tolower(names(vektis.df))
+
+# aggregate
+gem.df <- aggregate(kosten_medisch_specialistische_zorg ~ gemeentenaam, vektis.df, sum)
+
+# Vektis 2015 uses 2017 CBS names
+# fix broken names before joining the dataframes
+gm.vektis <- c(
+  "S GRAVENHAGE",
+  "S HERTOGENBOSCH",
+  "BERGEN LB",
+  "BERGEN NH",
+  "HAARLEMMERLIEDE CA",
+  "KOLLUMERLAND CA",
+  "NOORD BEVELAND",
+  "NUENEN CA",
+  "SUDWEST-FRYSLAN"
+  )
+  
+gm.cbs <- c(
+  "'S-GRAVENHAGE",
+  "'S-HERTOGENBOSCH",
+  "BERGEN (L.)",
+  "BERGEN (NH.)",
+  "HAARLEMMERLIEDE EN SPAARNWOUDE",
+  "KOLLUMERLAND EN NIEUWKRUISLAND",
+  "NOORD-BEVELAND",
+  "NUENEN, GERWEN EN NEDERWETTEN",
+  "SÃºDWEST-FRYSLÃ¢N"
+  )
+  
+gem.df$gemeentenaam <- mapvalues(gem.df$gemeentenaam, from = gm.vektis, to = gm.cbs)
+```
+
+
+
+Read the topology from the shapefile and turn it into a dataframe that can be plotted by `ggplot`. Note that areas that are marked as sea or lake (by the `WATER` property) are excluded, so that coast is displayed nicely.
+
+```{r}
+# prepare filenames
+basename <- gsub("buurt", "gem", tools::file_path_sans_ext(basename(cbsURL)))
+shpfile <- paste(basename, "shp", sep = ".")
+
+# create spatial object
+nl <- maptools::readShapeSpatial(paste(datadir, shpfile, sep = "/"))
+
+# remove watery areas
+nl <- nl[nl@data$WATER == "NEE", ]
+
+# create id to join data
+nl@data$id = as.character(nl@data$GM_CODE)
+
+# convert to ggplot object
+nl.points <- fortify(nl, region = "GM_CODE")
+
+# join the geo points and the data
+nl.df <- nl.points %>% 
+  left_join(nl@data, by = c("id" = "GM_CODE")) %>% 
+  mutate(GM_NAAM = toupper(as.character(GM_NAAM))) %>%
+  left_join(gem.df, by = c("GM_NAAM" = "gemeentenaam")) %>%
+  mutate(kosten = kosten_medisch_specialistische_zorg / AANT_INW) # kosten MSZ per inwoner
+```
+
+
+
+### Plot
+
+Create a basic plot of the map with minimal styling.
+
+```{r choropleth}
+# create the plot
+p <- ggplot(nl.df) + 
+  aes(x = long, y = lat, group = group, fill = kosten) + 
+  geom_polygon() +
+  geom_path(colour = "white", size = 0.25) +
+  scale_fill_distiller(palette = "PiYG") + 
+  labs(x = NULL, 
+       y = NULL, 
+       title = "Kosten MSZ",
+       subtitle = "Gemiddelde per inwoner (2015)") +
+  coord_equal() +
+  theme_minimal() +
+  theme (
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text = element_blank()
+  )
+
+p
+```
+
