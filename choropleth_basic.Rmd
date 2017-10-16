@@ -29,12 +29,11 @@ This document creates a basic choropleth from a CBS shapefile containing data ab
 Load the required packages and specify the file locations.
 
 ```{r}
-#install.packages(c("rgeos", "maptools", "ggplot2", "plyr", "ggthemes"))
+#install.packages(c("rgeos", "maptools", "ggplot2", "dplyr", "ggthemes"))
 library(rgeos)
-library(maptools)
 library(ggplot2)
 library(ggthemes)
-library(plyr)
+library(dplyr)
 
 # specify file locations
 URL <-"https://www.cbs.nl/-/media/_pdf/2017/36/buurt_2015.zip"
@@ -76,13 +75,13 @@ nl <- maptools::readShapeSpatial(paste(datadir, shpfile, sep = "/"))
 nl <- nl[nl@data$WATER == "NEE", ]
 
 # create id to join data
-nl@data$id = as.character(nl@data$GM_CODE)
+nl@data$id <- as.character(nl@data$GM_CODE)
 
 # convert to ggplot object
 nl.points <- fortify(nl, region = "GM_CODE")
 
 # join the geo points and the data
-nl.df <- join(nl.points, nl@data, by = c("GM_CODE" = "id"))
+nl.df <- nl.points %>% left_join(nl@data, by = "id")
 ```
 
 

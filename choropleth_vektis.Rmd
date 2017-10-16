@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 ```
 
 
-This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb) and [Kadaster](https://www.kadaster.com/). 
+This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb), [Kadaster](https://www.kadaster.com/) and [Vektis](https://www.vektis.nl/streams/open-data). 
 
 
 ### Setup
@@ -29,9 +29,8 @@ This document creates a basic choropleth from a CBS shapefile containing data ab
 Load the required packages and specify the file locations.
 
 ```{r}
-#install.packages(c("rgeos", "maptools", "ggplot2", "dplyr", "plyr", "ggthemes"))
+#install.packages(c("rgeos", "maptools", "ggplot2", "plyr", "dplyr", "ggthemes"))
 library(rgeos)
-library(maptools)
 library(ggplot2)
 library(ggthemes)
 library(plyr)
@@ -78,8 +77,11 @@ Read Vektis data first and aggregate by municipality. Municipality names that di
 vektis.df <- read.csv(csv, sep = ";", stringsAsFactors = FALSE)
 names(vektis.df) <- tolower(names(vektis.df))
 
+# compute cost per insured person
+vektis.df$gem_kosten <- vektis.df$kosten_medisch_specialistische_zorg / vektis.df$aantal_verzekerdejaren
+
 # aggregate
-gem.df <- aggregate(kosten_medisch_specialistische_zorg ~ gemeentenaam, vektis.df, sum)
+gem.df <- aggregate(gem_kosten ~ gemeentenaam, vektis.df, sum)
 
 # Vektis 2015 uses 2017 CBS names
 # fix broken names before joining the dataframes
@@ -126,17 +128,16 @@ nl <- maptools::readShapeSpatial(paste(datadir, shpfile, sep = "/"))
 nl <- nl[nl@data$WATER == "NEE", ]
 
 # create id to join data
-nl@data$id = as.character(nl@data$GM_CODE)
+nl@data$id <- as.character(nl@data$GM_CODE)
 
 # convert to ggplot object
 nl.points <- fortify(nl, region = "GM_CODE")
 
 # join the geo points and the data
 nl.df <- nl.points %>% 
-  left_join(nl@data, by = c("id" = "GM_CODE")) %>% 
+  left_join(nl@data, by = "id") %>% 
   mutate(GM_NAAM = toupper(as.character(GM_NAAM))) %>%
-  left_join(gem.df, by = c("GM_NAAM" = "gemeentenaam")) %>%
-  mutate(kosten = kosten_medisch_specialistische_zorg / AANT_INW) # kosten MSZ per inwoner
+  left_join(gem.df, by = c("GM_NAAM" = "gemeentenaam"))
 ```
 
 
@@ -148,14 +149,14 @@ Create a basic plot of the map with minimal styling.
 ```{r choropleth}
 # create the plot
 p <- ggplot(nl.df) + 
-  aes(x = long, y = lat, group = group, fill = kosten) + 
+  aes(x = long, y = lat, group = group, fill = gem_kosten) + 
   geom_polygon() +
   geom_path(colour = "white", size = 0.25) +
   scale_fill_distiller(palette = "PiYG") + 
   labs(x = NULL, 
        y = NULL, 
        title = "Kosten MSZ",
-       subtitle = "Gemiddelde per inwoner (2015)") +
+       subtitle = "Gemiddelde kosten per verzekerde (2015)") +
   coord_equal() +
   theme_minimal() +
   theme (
