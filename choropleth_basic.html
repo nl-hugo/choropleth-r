@@ -171,7 +171,7 @@ nl@data$id = as.character(nl@data$GM_CODE)
 nl.points &lt;- fortify(nl, region = &quot;GM_CODE&quot;)
 
 # join the geo points and the data
-nl.df = join(nl.points, nl@data, by = c(&quot;GM_CODE&quot; = &quot;id&quot;))</code></pre>
+nl.df &lt;- join(nl.points, nl@data, by = c(&quot;GM_CODE&quot; = &quot;id&quot;))</code></pre>
 </div>
 <div id="plot" class="section level3">
 <h3>Plot</h3>

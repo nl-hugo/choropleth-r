@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
   strip.white = T,
   dev = "png",
   dev.args = list(png = list(bg = "transparent")),
-  echo=TRUE, warning=FALSE, message=FALSE
+  echo = TRUE, warning = FALSE, message = FALSE
 )
 ```
 
@@ -82,7 +82,7 @@ nl@data$id = as.character(nl@data$GM_CODE)
 nl.points <- fortify(nl, region = "GM_CODE")
 
 # join the geo points and the data
-nl.df = join(nl.points, nl@data, by = c("GM_CODE" = "id"))
+nl.df <- join(nl.points, nl@data, by = c("GM_CODE" = "id"))
 ```
 
 
