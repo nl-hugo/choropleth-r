@@ -1,34 +1,15 @@
----
-title: "Choropleth with Vektis data"
-author: "Hugo Janssen (nl-hugo)"
-date: "`r format(Sys.time(), '%d-%m-%Y')`"
-output: github_document
----
+Choropleth with Vektis data
+================
+Hugo Janssen (nl-hugo)
+16-10-2017
 
-
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  out.width = "100%",
-  dpi = 300,
-  fig.width = 6,
-  fig.height = 5,
-  fig.path = "img/kosten-msz-",
-  strip.white = T,
-  dev = "png",
-  dev.args = list(png = list(bg = "transparent")),
-  echo = TRUE, warning = FALSE, message = FALSE
-)
-```
-
-
-This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb), [Kadaster](https://www.kadaster.com/) and [Vektis](https://www.vektis.nl/streams/open-data). 
-
+This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb), [Kadaster](https://www.kadaster.com/) and [Vektis](https://www.vektis.nl/streams/open-data).
 
 ### Setup
 
 Load the required packages and specify the file locations.
 
-```{r}
+``` r
 #install.packages(c("rgeos", "maptools", "ggplot2", "plyr", "dplyr", "ggthemes"))
 library(rgeos)
 library(ggplot2)
@@ -40,15 +21,13 @@ library(dplyr)
 cbsURL <-"https://www.cbs.nl/-/media/_pdf/2017/36/buurt_2017.zip"
 vektisURL <- "https://www.vektis.nl/uploads/Docs%20per%20pagina/Open%20Data%20Bestanden/Vektis%20Open%20Databestand%20Zorgverzekeringswet%202015%20-%20gemeente.csv"
 datadir <- "data"
-
 ```
-
 
 ### Download
 
-Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present. 
+Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present.
 
-```{r}
+``` r
 csv <- paste(datadir, "gemeente_2015.csv", sep = "/")
 
 # create a dir and download if no datadir is present 
@@ -66,13 +45,11 @@ if (!file.exists(datadir)) {
 }
 ```
 
-
 ### Prepare data
-
 
 Read Vektis data first and aggregate by municipality. Municipality names that differ from the official CBS name, need to be renamed.
 
-```{r}
+``` r
 # read csv
 vektis.df <- read.csv(csv, sep = ";", stringsAsFactors = FALSE)
 names(vektis.df) <- tolower(names(vektis.df))
@@ -112,11 +89,9 @@ gm.cbs <- c(
 gem.df$gemeentenaam <- mapvalues(gem.df$gemeentenaam, from = gm.vektis, to = gm.cbs)
 ```
 
-
-
 Read the topology from the shapefile and turn it into a dataframe that can be plotted by `ggplot`. Note that areas that are marked as sea or lake (by the `WATER` property) are excluded, so that coast is displayed nicely.
 
-```{r}
+``` r
 # prepare filenames
 basename <- gsub("buurt", "gem", tools::file_path_sans_ext(basename(cbsURL)))
 shpfile <- paste(basename, "shp", sep = ".")
@@ -140,13 +115,11 @@ nl.df <- nl.points %>%
   left_join(gem.df, by = c("GM_NAAM" = "gemeentenaam"))
 ```
 
-
-
 ### Plot
 
 Create a basic plot of the map with minimal styling.
 
-```{r choropleth}
+``` r
 # create the plot
 p <- ggplot(nl.df) + 
   aes(x = long, y = lat, group = group, fill = gem_kosten) + 
@@ -168,3 +141,4 @@ p <- ggplot(nl.df) +
 p
 ```
 
+<img src="img/kosten-msz-choropleth-1.png" width="100%" />
