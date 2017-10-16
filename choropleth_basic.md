@@ -1,34 +1,15 @@
----
-title: "Basic choropleth"
-author: "Hugo Janssen (nl-hugo)"
-date: "`r format(Sys.time(), '%d-%m-%Y')`"
-output: github_document
----
+Basic choropleth
+================
+Hugo Janssen (nl-hugo)
+16-10-2017
 
-
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  out.width = "100%",
-  dpi = 300,
-  fig.width = 6,
-  fig.height = 5,
-  fig.path = "img/basic-",
-  strip.white = T,
-  dev = "png",
-  dev.args = list(png = list(bg = "transparent")),
-  echo = TRUE, warning = FALSE, message = FALSE
-)
-```
-
-
-This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb) and [Kadaster](https://www.kadaster.com/). 
-
+This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb) and [Kadaster](https://www.kadaster.com/).
 
 ### Setup
 
 Load the required packages and specify the file locations.
 
-```{r}
+``` r
 #install.packages(c("rgeos", "maptools", "ggplot2", "dplyr", "ggthemes"))
 library(rgeos)
 library(ggplot2)
@@ -38,15 +19,13 @@ library(dplyr)
 # specify file locations
 URL <-"https://www.cbs.nl/-/media/_pdf/2017/36/buurt_2015.zip"
 datadir <- "data"
-
 ```
-
 
 ### Download
 
-Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present. 
+Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present.
 
-```{r}
+``` r
 # create a dir and download if no datadir is present 
 # assumes that files are downloaded if a datadir is present
 if (!file.exists(datadir)) {
@@ -58,12 +37,11 @@ if (!file.exists(datadir)) {
 }
 ```
 
-
 ### Prepare data
 
 Read the topology from the shapefile and turn it into a dataframe that can be plotted by `ggplot`. Note that areas that are marked as sea or lake (by the `WATER` property) are excluded, so that coast is displayed nicely.
 
-```{r}
+``` r
 # prepare filenames
 basename <- gsub("buurt", "gem", tools::file_path_sans_ext(basename(URL)))
 shpfile <- paste(basename, "shp", sep = ".")
@@ -84,13 +62,11 @@ nl.points <- fortify(nl, region = "GM_CODE")
 nl.df <- nl.points %>% left_join(nl@data, by = "id")
 ```
 
-
-
 ### Plot
 
 Create a basic plot of the map with minimal styling.
 
-```{r choropleth}
+``` r
 # create the plot
 p <- ggplot(nl.df) + 
   aes(x = long, y = lat, group = group, fill = P_GEBOO) + 
@@ -112,3 +88,4 @@ p <- ggplot(nl.df) +
 p
 ```
 
+<img src="img/basic-choropleth-1.png" width="100%" />
