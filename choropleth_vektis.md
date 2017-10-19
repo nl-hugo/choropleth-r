@@ -1,7 +1,7 @@
 Choropleth with Vektis data
 ================
 Hugo Janssen (nl-hugo)
-16-10-2017
+19-10-2017
 
 This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb), [Kadaster](https://www.kadaster.com/) and [Vektis](https://www.vektis.nl/streams/open-data).
 
@@ -10,11 +10,9 @@ This document creates a basic choropleth from a CBS shapefile containing data ab
 Load the required packages and specify the file locations.
 
 ``` r
-#install.packages(c("rgeos", "maptools", "ggplot2", "plyr", "dplyr", "ggthemes"))
-library(rgeos)
+#install.packages(c("ggplot2", "dplyr", "ggthemes", "rgdal", "sp", "plyr"))
 library(ggplot2)
 library(ggthemes)
-library(plyr)
 library(dplyr)
 
 # specify file locations
@@ -28,19 +26,20 @@ datadir <- "data"
 Download the zipped data file and unzip. Note that files are downloaded only when no data folder is present.
 
 ``` r
-csv <- paste(datadir, "gemeente_2015.csv", sep = "/")
-
-# create a dir and download if no datadir is present 
-# assumes that files are downloaded if a datadir is present
+# create a dir if no datadir is present 
 if (!file.exists(datadir)) {
   dir.create(datadir)
+}
 
-  # cbs bestanden
-  tmpfile <- paste(datadir, basename(cbsURL), sep = "/")
+# download only when file does not exists
+tmpfile <- paste(datadir, basename(cbsURL), sep = "/")
+if (!file.exists(tmpfile)) {
   download.file(cbsURL, destfile = tmpfile)
-  unzip(tmpfile, exdir="./data")
-  
-  # vektis bestanden
+  unzip(tmpfile, exdir = datadir)
+}
+
+csv <- paste(datadir, "gemeente_2015.csv", sep = "/")
+if (!file.exists(csv)) {
   download.file(vektisURL, destfile = csv)
 }
 ```
@@ -86,21 +85,31 @@ gm.cbs <- c(
   "SÃºDWEST-FRYSLÃ¢N"
   )
   
-gem.df$gemeentenaam <- mapvalues(gem.df$gemeentenaam, from = gm.vektis, to = gm.cbs)
+gem.df$gemeentenaam <- plyr::mapvalues(gem.df$gemeentenaam, from = gm.vektis, to = gm.cbs)
 ```
 
 Read the topology from the shapefile and turn it into a dataframe that can be plotted by `ggplot`. Note that areas that are marked as sea or lake (by the `WATER` property) are excluded, so that coast is displayed nicely.
 
 ``` r
-# prepare filenames
-basename <- gsub("buurt", "gem", tools::file_path_sans_ext(basename(cbsURL)))
-shpfile <- paste(basename, "shp", sep = ".")
+# define the layer to extract
+layer <-
+  gsub("buurt", "gem", tools::file_path_sans_ext(basename(cbsURL)))
 
-# create spatial object
-nl <- maptools::readShapeSpatial(paste(datadir, shpfile, sep = "/"))
+# read spatial object from file
+nl <-
+  rgdal::readOGR(
+  datadir,
+  layer = layer,
+  verbose = FALSE,
+  stringsAsFactors = FALSE
+  )
 
 # remove watery areas
-nl <- nl[nl@data$WATER == "NEE", ]
+nl <- nl[nl@data$WATER == "NEE",]
+
+# reproject to WGS84
+nl <-
+  sp::spTransform(nl, sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
 
 # create id to join data
 nl@data$id <- as.character(nl@data$GM_CODE)
@@ -109,8 +118,8 @@ nl@data$id <- as.character(nl@data$GM_CODE)
 nl.points <- fortify(nl, region = "GM_CODE")
 
 # join the geo points and the data
-nl.df <- nl.points %>% 
-  left_join(nl@data, by = "id") %>% 
+nl.df <- nl.points %>%
+  left_join(nl@data, by = "id") %>%
   mutate(GM_NAAM = toupper(as.character(GM_NAAM))) %>%
   left_join(gem.df, by = c("GM_NAAM" = "gemeentenaam"))
 ```
@@ -130,7 +139,7 @@ p <- ggplot(nl.df) +
        y = NULL, 
        title = "Kosten MSZ",
        subtitle = "Gemiddelde kosten per verzekerde (2015)") +
-  coord_equal() +
+  coord_fixed(ratio = 1.5) +
   theme_minimal() +
   theme (
     panel.grid.major = element_blank(), 
