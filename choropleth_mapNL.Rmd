@@ -1,0 +1,65 @@
+---
+title: "Basic choropleth"
+author: "Hugo Janssen (nl-hugo)"
+date: "`r format(Sys.time(), '%d-%m-%Y')`"
+output: github_document
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  out.width = "100%",
+  dpi = 300,
+  fig.path = "img/map-nl-",
+  strip.white = T,
+  dev = "png",
+  dev.args = list(png = list(bg = "transparent")),
+  echo = TRUE, warning = FALSE, message = FALSE
+)
+```
+
+
+This document creates a basic choropleth from a CBS shapefile containing data about The Netherlands. Data provided by the Dutch Statistics Center [CBS](https://www.cbs.nl/en-gb) and [Kadaster](https://www.kadaster.com/). Similar to `choropleth_basic`, but this time with the help of the `mapNL` package.
+
+
+### Setup
+
+Load the required packages and specify the file locations.
+
+```{r}
+#install.packages(c("ggplot2", "ggthemes", "devtools"))
+library(ggplot2)
+library(ggthemes)
+library(devtools)
+
+# loading the package may take a while
+install_github("nl-hugo/mapNL")
+```
+
+
+### Plot
+
+The data preparation steps can be skipped now that we use the `mapNL` package. Just create a plot of the map.
+
+```{r choropleth}
+# create the plot
+p <- ggplot(mapNL::gem_2017) + 
+  aes(x = long, y = lat, group = group, fill = as.numeric(bev_dichth)) + 
+  geom_polygon() +
+  geom_path(colour = "white", size = 0.25) +
+  scale_fill_distiller(palette = "YlGnBu", direction = 1) + 
+  labs(x = NULL, 
+       y = NULL, 
+       title = "Bevolkingsdichtheid",
+       subtitle = expression("Aantal inwoners per "~ km^2)) +
+  coord_fixed(ratio = 1.5) +
+  theme_minimal() +
+  theme (
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text = element_blank()
+  )
+
+p
+```
+
